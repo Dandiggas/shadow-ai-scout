@@ -103,3 +103,5 @@ def test_clean_policy_pass_caps_adverse_claims_at_needs_review_not_reject():
     assert verdict.failed_policy == []
     assert verdict.verdict == "needs review"
     assert 51 <= verdict.risk_score <= 75
+    assert any(reason.label == "Source code exposure" and reason.source_url == "https://third-party.example/cursor" for reason in verdict.score_reasons)
+    assert any("source-code" in step.action.lower() for step in verdict.remediation_steps)

@@ -42,6 +42,19 @@ class RequirementAssessment(BaseModel):
     score_delta: int
 
 
+class ScoreReason(BaseModel):
+    label: str
+    score_delta: int
+    evidence_quote: str = ""
+    source_url: str = ""
+
+
+class RemediationStep(BaseModel):
+    action: str
+    rationale: str
+    source_url: str = ""
+
+
 class ToolVerdict(BaseModel):
     tool_name: str
     risk_score: int = Field(ge=0, le=100)
@@ -49,6 +62,8 @@ class ToolVerdict(BaseModel):
     failed_policy: list[str]
     summary: str
     recommended_policy: str
+    score_reasons: list[ScoreReason] = Field(default_factory=list)
+    remediation_steps: list[RemediationStep] = Field(default_factory=list)
     requirements: list[RequirementAssessment] = Field(default_factory=list)
 
 

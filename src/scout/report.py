@@ -41,5 +41,30 @@ def render_markdown_report(company_context: str, verdicts: list[ToolVerdict]) ->
             source = assessment.source_url or "-"
             lines.append(f"| {assessment.label} | {assessment.status} | {evidence} | {source} | {assessment.action} |")
 
+        lines.extend([
+            "",
+            "### Why this score?",
+            "",
+            "| Reason | Score impact | Evidence | Source |",
+            "|---|---:|---|---|",
+        ])
+        for reason in verdict.score_reasons:
+            evidence = reason.evidence_quote.replace("|", "\\|") if reason.evidence_quote else "-"
+            source = reason.source_url or "-"
+            sign = "+" if reason.score_delta >= 0 else ""
+            lines.append(f"| {reason.label} | {sign}{reason.score_delta} | {evidence} | {source} |")
+
+        lines.extend([
+            "",
+            "### Compliance roadmap",
+            "",
+            "| Action | Why | Source |",
+            "|---|---|---|",
+        ])
+        for step in verdict.remediation_steps:
+            rationale = step.rationale.replace("|", "\\|") if step.rationale else "-"
+            source = step.source_url or "-"
+            lines.append(f"| {step.action} | {rationale} | {source} |")
+
     lines.append("")
     return "\n".join(lines)

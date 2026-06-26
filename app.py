@@ -89,6 +89,34 @@ if st.button(button_label):
 
     for verdict in result.verdicts:
         with st.expander(f"Evidence drilldown: {verdict.tool_name}"):
+            st.markdown("#### Why this score?")
+            st.dataframe(
+                [
+                    {
+                        "Reason": reason.label,
+                        "Score impact": reason.score_delta,
+                        "Evidence": reason.evidence_quote,
+                        "Source": reason.source_url,
+                    }
+                    for reason in verdict.score_reasons
+                ],
+                use_container_width=True,
+            )
+
+            st.markdown("#### Compliance roadmap")
+            st.dataframe(
+                [
+                    {
+                        "Action": step.action,
+                        "Why": step.rationale,
+                        "Source": step.source_url,
+                    }
+                    for step in verdict.remediation_steps
+                ],
+                use_container_width=True,
+            )
+
+            st.markdown("#### Requirement evidence")
             for req in verdict.requirements:
                 st.markdown(f"**{req.label}**: `{req.status}`")
                 st.write(req.evidence_quote or "No public evidence found")
