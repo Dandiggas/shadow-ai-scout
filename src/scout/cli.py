@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from scout.agentic import run_agentic_scan
+from scout.errors import ScoutAPIError
 from scout.pipeline import run_cached_scan
 
 app = typer.Typer(help="Shadow AI Scout: policy-evidence scanner for AI vendor review")
@@ -49,7 +50,13 @@ def scan(
     max_iterations: int = typer.Option(3, help="Plan-act-observe loops per tool"),
 ):
     """Run the live agentic scan. Requires TAVILY_API_KEY and GEMINI_API_KEY/GOOGLE_API_KEY."""
-    result = run_agentic_scan([t.strip() for t in tools.split(",") if t.strip()], company_context, output_dir, max_iterations=max_iterations)
+    try:
+        result = run_agentic_scan([t.strip() for t in tools.split(",") if t.strip()], company_context, output_dir, max_iterations=max_iterations)
+    except ScoutAPIError as exc:
+        console.print(f"[red]{exc.provider} setup error[/red]: {exc.user_message}")
+        if exc.detail:
+            console.print(f"[dim]{exc.detail}[/dim]")
+        raise typer.Exit(code=1) from exc
     _print_result(result)
     trace_path = output_dir / "agent_trace.json"
     console.print(f"Agent trace: {trace_path}")

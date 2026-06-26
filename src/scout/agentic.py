@@ -14,6 +14,7 @@ from uuid import uuid4
 import httpx
 from dotenv import load_dotenv
 
+from scout.errors import ScoutAPIError, provider_key_error
 from scout.extraction import classify_source_type, discard_claims_without_quotes
 from scout.models import EvidenceClaim, ScanResult, SourceRecord, ToolVerdict
 from scout.policy import default_requirements
@@ -86,7 +87,12 @@ class TavilySearcher:
                 "include_raw_content": False,
             },
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if response.status_code in {400, 401, 403}:
+                raise provider_key_error("Tavily", response.status_code, f"{response.url}: {response.text}") from exc
+            raise ScoutAPIError("Tavily", "Tavily search failed. Try again or reduce scan scope.", f"HTTP {response.status_code}: {response.text[:300]}") from exc
         payload = response.json()
         return [
             SearchResult(
@@ -126,7 +132,12 @@ class GeminiExtractor:
         prompt = self._prompt(tool_name, source_url, source_type, page_text, company_context)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
         response = self.client.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if response.status_code in {400, 401, 403}:
+                raise provider_key_error("Gemini", response.status_code, f"{response.url}: {response.text}") from exc
+            raise ScoutAPIError("Gemini", "Gemini extraction failed. Try again or reduce fetched page size.", f"HTTP {response.status_code}: {response.text[:300]}") from exc
         data = response.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         claims_payload = _parse_json_array(text)

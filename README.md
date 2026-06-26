@@ -40,10 +40,15 @@ cp .env.example .env
 Add keys to `.env` for live mode:
 
 ```env
-TAVILY_API_KEY=...
-GEMINI_API_KEY=...
-# or GOOGLE_API_KEY=...
+TAVILY_API_KEY=tvly-...
+GEMINI_API_KEY=AIza...
+# or GOOGLE_API_KEY=AIza...
 ```
+
+If live scan says Tavily/Gemini rejected the key, regenerate keys here:
+
+- Tavily: https://app.tavily.com/
+- Gemini: https://aistudio.google.com/apikey
 
 ## Run cached demo — no keys
 
@@ -72,7 +77,14 @@ Live outputs go to `reports/live_run/`:
 uv run streamlit run app.py
 ```
 
-The UI supports cached demo mode and live agentic scan mode.
+The UI supports:
+
+- approval queue request fields
+- cached demo mode
+- live agentic scan mode
+- evidence drilldown
+- agent trace panel
+- saved decisions for repeat tool requests
 
 ## Tests
 
@@ -89,7 +101,15 @@ uv run --extra dev pytest -q
 - Markdown report generator.
 - ClickHouse insert file.
 - Agent trace output.
-- Streamlit dashboard shell.
+- Streamlit approval queue, trace panel, evidence drilldown, and saved decisions.
+
+## Buyer / money logic
+
+See `docs/value-prop-and-buyer.md`.
+
+Money line:
+
+> **Shadow AI Scout cuts first-pass AI vendor reviews from ~60 minutes to ~5 minutes by automatically collecting evidence, matching it to company policy, and producing an audit-ready decision packet.**
 
 ## Hackathon demo line
 
