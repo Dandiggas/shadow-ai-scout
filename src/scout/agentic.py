@@ -123,7 +123,7 @@ class PageFetcher:
 class GeminiExtractor:
     def __init__(self, api_key: str | None = None, model: str | None = None, client: httpx.Client | None = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         self.client = client or httpx.Client(timeout=45)
 
     def extract(self, tool_name: str, source_url: str, source_type: str, page_text: str, company_context: str) -> list[EvidenceClaim]:
@@ -137,6 +137,12 @@ class GeminiExtractor:
         except httpx.HTTPStatusError as exc:
             if response.status_code in {400, 401, 403}:
                 raise provider_key_error("Gemini", response.status_code, f"{response.url}: {response.text}") from exc
+            if response.status_code == 429:
+                raise ScoutAPIError(
+                    "Gemini",
+                    "Gemini quota is exhausted for this key. Check Google AI Studio quota/billing or use another GEMINI_API_KEY.",
+                    f"HTTP 429: {response.text[:300]}",
+                ) from exc
             raise ScoutAPIError("Gemini", "Gemini extraction failed. Try again or reduce fetched page size.", f"HTTP {response.status_code}: {response.text[:300]}") from exc
         data = response.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -267,6 +273,8 @@ class AgenticScanner:
                     self.trace.append(AgentStep(iteration, tool_name, f"Read {source.source_type} source", "fetch_page", result.url))
                     try:
                         claims = self.extractor.extract(tool_name, result.url, source.source_type, page_text, company_context)
+                    except ScoutAPIError:
+                        raise
                     except Exception as exc:
                         self.trace.append(AgentStep(iteration, tool_name, "Extract risk claims", "gemini_extract", f"failed {result.url}: {exc}"))
                         continue
