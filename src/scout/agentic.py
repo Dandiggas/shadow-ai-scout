@@ -123,7 +123,7 @@ class PageFetcher:
 class GeminiExtractor:
     def __init__(self, api_key: str | None = None, model: str | None = None, client: httpx.Client | None = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
         self.client = client or httpx.Client(timeout=45)
 
     def extract(self, tool_name: str, source_url: str, source_type: str, page_text: str, company_context: str) -> list[EvidenceClaim]:
