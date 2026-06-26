@@ -86,6 +86,21 @@ The UI supports:
 - agent trace panel
 - saved decisions for repeat tool requests
 
+## Weekly approved-product review
+
+Saved approvals can be rescanned on a schedule. The CLI only reviews tools with saved verdicts of `approve` or `conditional approve`:
+
+```bash
+uv run shadow-scout review-approved --live --max-iterations 1
+```
+
+The weekly review writes timestamped audit packets under `reports/weekly_review/`:
+
+- `weekly_review_summary.md` — escalation summary for approved tools whose posture changed
+- `cited.md` — full cited compliance report
+- `evidence.json` — sources, claims, verdicts, requirements, and score reasons
+- `clickhouse_inserts.sql` — ClickHouse-ready audit inserts
+
 ## Tests
 
 ```bash
