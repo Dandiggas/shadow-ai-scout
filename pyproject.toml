@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scout"]
+
+[project]
+name = "shadow-ai-scout"
+version = "0.1.0"
+description = "Policy-evidence scanner for shadow AI vendor review"
+requires-python = ">=3.9"
+dependencies = [
+  "pydantic>=2.0",
+  "httpx>=0.27",
+  "typer>=0.12",
+  "rich>=13.0",
+  "python-dotenv>=1.0",
+  "pyyaml>=6.0",
+  "streamlit>=1.36",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+shadow-scout = "scout.cli:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
