@@ -23,6 +23,9 @@ class SavedDecision(BaseModel):
     risk_score: int
     failed_policy: list[str]
     recommended_policy: str
+    allowed_usage: list[str] = Field(default_factory=list)
+    blocked_usage: list[str] = Field(default_factory=list)
+    required_controls: list[str] = Field(default_factory=list)
     employee: str
     use_case: str
     data_involved: str
@@ -51,18 +54,33 @@ class DecisionStore:
             risk_score=verdict.risk_score,
             failed_policy=verdict.failed_policy,
             recommended_policy=verdict.recommended_policy,
+            allowed_usage=verdict.allowed_usage,
+            blocked_usage=verdict.blocked_usage,
+            required_controls=verdict.required_controls,
             employee=request.employee,
             use_case=request.use_case,
             data_involved=request.data_involved,
             decided_at=datetime.now(timezone.utc).isoformat(),
         )
-        decisions = [d for d in self._load() if d.tool_name.lower() != verdict.tool_name.lower()]
+        decisions = [
+            d
+            for d in self._load()
+            if not (
+                d.tool_name.lower() == verdict.tool_name.lower()
+                and d.use_case.lower() == request.use_case.lower()
+                and d.data_involved.lower() == request.data_involved.lower()
+            )
+        ]
         decisions.append(decision)
         self._save_all(decisions)
         return decision
 
-    def find_previous(self, tool_name: str) -> SavedDecision | None:
+    def find_previous(self, tool_name: str, use_case: str | None = None, data_involved: str | None = None) -> SavedDecision | None:
         matching = [d for d in self._load() if d.tool_name.lower() == tool_name.lower()]
+        if use_case is not None:
+            matching = [d for d in matching if d.use_case.lower() == use_case.lower()]
+        if data_involved is not None:
+            matching = [d for d in matching if d.data_involved.lower() == data_involved.lower()]
         if not matching:
             return None
         return sorted(matching, key=lambda d: d.decided_at, reverse=True)[0]

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scout.approvals import DecisionStore
+from scout.approvals import DecisionStore, SavedDecision
 from scout.models import ScanResult
 from scout.pipeline import run_cached_scan
 
@@ -44,26 +44,42 @@ def review_approved_products(
         )
         raise ValueError("No approved products found in the decision store")
 
+    previous_decisions = store.list_decisions()
     result = scan_func(tools, company_context, output_dir)
-    _write_weekly_summary(result, output_dir)
+    _write_weekly_summary(result, output_dir, previous_decisions)
     return result
 
 
-def _write_weekly_summary(result: ScanResult, output_dir: Path) -> Path:
+def _latest_by_tool(decisions: list[SavedDecision]) -> dict[str, SavedDecision]:
+    latest: dict[str, SavedDecision] = {}
+    for decision in sorted(decisions, key=lambda d: d.decided_at):
+        latest[decision.tool_name.lower()] = decision
+    return latest
+
+
+def _write_weekly_summary(result: ScanResult, output_dir: Path, previous_decisions: list[SavedDecision] | None = None) -> Path:
     path = output_dir / "weekly_review_summary.md"
+    previous_by_tool = _latest_by_tool(previous_decisions or [])
     lines = [
         "# Weekly compliance review",
         "",
         f"Reviewed at: {datetime.now(timezone.utc).isoformat()}",
         "",
-        "| Tool | Current verdict | Score | Action |",
-        "|---|---|---:|---|",
+        "| Tool | Previous verdict | Previous score | Current verdict | Current score | Delta | Action |",
+        "|---|---|---:|---|---:|---:|---|",
     ]
     for verdict in result.verdicts:
+        previous = previous_by_tool.get(verdict.tool_name.lower())
+        previous_verdict = previous.verdict if previous else "new"
+        previous_score = previous.risk_score if previous else 0
+        delta = verdict.risk_score - previous_score
+        delta_text = f"{delta:+d}"
         action = verdict.recommended_policy
+        if previous and (verdict.verdict != previous.verdict or delta > 0):
+            action = f"Drift detected from saved decision. {action}"
         if verdict.verdict in {"reject/high risk", "needs review"}:
             action = "Escalate: previously approved tool now needs review. " + action
-        lines.append(f"| {verdict.tool_name} | {verdict.verdict} | {verdict.risk_score} | {action} |")
+        lines.append(f"| {verdict.tool_name} | {previous_verdict} | {previous_score} | {verdict.verdict} | {verdict.risk_score} | {delta_text} | {action} |")
 
     lines.extend([
         "",

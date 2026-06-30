@@ -5,22 +5,33 @@ from pathlib import Path
 
 import streamlit as st
 
+import ui
 from scout.agentic import run_agentic_scan
 from scout.approvals import ApprovalRequest, DecisionStore
 from scout.errors import ScoutAPIError
 from scout.pipeline import run_cached_scan
 
-st.set_page_config(page_title="Shadow AI Scout", layout="wide")
-st.title("Shadow AI Scout")
-st.caption("AI tool approval infrastructure: policy + public evidence + audit packet")
+st.set_page_config(page_title="Shadow AI Scout", layout="wide", page_icon="🛰️")
 
+# Theme switch lives in the sidebar; pick it before injecting styles so the
+# selected palette applies on this same run.
+with st.sidebar:
+    st.markdown("### Appearance")
+    active_theme = ui.theme_toggle()
+    st.caption("Switch between dark and light. Your choice is remembered.")
+
+ui.inject_styles(active_theme)
+ui.hero()
+
+ui.section("Company policy", "The compliance baseline every requested tool is scored against.")
 company_context = st.text_area(
     "Company policy / compliance baseline",
     "Security-sensitive company. Handles proprietary source code, confidential customer data, and sensitive internal meetings. Requires SSO/admin controls, no training on customer data, DPA, deletion/retention controls, and SOC2 or equivalent preferred.",
     height=140,
+    label_visibility="collapsed",
 )
 
-st.subheader("Approval queue")
+ui.section("Approval queue", "Capture the request, then run a scan to produce an audit-ready decision packet.")
 queue_cols = st.columns(4)
 with queue_cols[0]:
     employee = st.text_input("Employee", "employee@company.com")
@@ -47,19 +58,60 @@ for tool_name in requested_tools:
             }
         )
 if previous_rows:
-    st.info("Saved decision found for one or more requested tools.")
-    st.dataframe(previous_rows, use_container_width=True)
+    st.markdown(
+        f'<div class="banner" style="text-align:left;">📌 <b>Saved decision found</b> for '
+        f'{len(previous_rows)} of the requested tool(s). Prior verdicts shown below.</div>',
+        unsafe_allow_html=True,
+    )
+    st.dataframe(previous_rows, use_container_width=True, hide_index=True)
 
-mode = st.radio("Scan mode", ["Cached demo", "Live agentic scan"], horizontal=True)
-button_label = "Run cached demo scan" if mode == "Cached demo" else "Run live agentic scan"
+ui.section("Run a scan")
+scan_cols = st.columns([2, 1])
+with scan_cols[0]:
+    mode = st.radio(
+        "Scan mode",
+        ["Cached demo", "Live agentic scan"],
+        horizontal=True,
+        captions=["No API keys · instant", "Live web + Claude · cited evidence"],
+    )
+with scan_cols[1]:
+    st.write("")
+    button_label = "Run cached demo scan" if mode == "Cached demo" else "Run live agentic scan"
+    run_clicked = st.button(button_label, type="primary", use_container_width=True)
 
-if st.button(button_label):
+if run_clicked:
+    if not requested_tools:
+        st.warning("Add at least one tool in **Tools requested** before scanning.")
+        st.stop()
+
     output_dir = Path("reports/demo_run_cached" if mode == "Cached demo" else "reports/live_run")
+    _ICONS = {
+        "tool": "🔎", "plan": "🧭", "search": "🌐", "read": "📄",
+        "extract": "✅", "skip": "⏭️", "done": "🎯", "score": "🧮",
+    }
     try:
         if mode == "Cached demo":
-            result = run_cached_scan(requested_tools, company_context, output_dir)
+            with st.spinner("Running cached demo scan…"):
+                result = run_cached_scan(requested_tools, company_context, output_dir)
         else:
-            result = run_agentic_scan(requested_tools, company_context, output_dir)
+            label = f"Scanning {len(requested_tools)} tool(s) live — gathering public evidence with Claude…"
+            with st.status(label, expanded=True) as status:
+                st.caption(
+                    "Live scans search the web, read each vendor's privacy/security/terms pages, "
+                    "and ask Claude to extract cited evidence. Expect roughly 20–60s per tool."
+                )
+
+                def on_progress(event: str, message: str) -> None:
+                    status.write(f"{_ICONS.get(event, '•')} {message}")
+
+                result = run_agentic_scan(
+                    requested_tools,
+                    company_context,
+                    output_dir,
+                    max_iterations=2,
+                    progress=on_progress,
+                )
+                status.update(label="Scan complete — audit packet ready", state="complete", expanded=False)
     except ScoutAPIError as exc:
         st.error(f"{exc.provider} setup error: {exc.user_message}")
         if exc.detail:
@@ -75,20 +127,29 @@ if st.button(button_label):
     ).model_dump()
     st.session_state["last_output_dir"] = str(output_dir)
 
-    rows = [
-        {
-            "Tool": v.tool_name,
-            "Verdict": v.verdict,
-            "Score": v.risk_score,
-            "Failed policy": ", ".join(v.failed_policy) or "None",
-        }
-        for v in result.verdicts
-    ]
-    st.subheader("Verdict table")
-    st.dataframe(rows, use_container_width=True)
+    ui.section("Verdicts", "One card per tool, color-coded by risk posture.")
+    verdicts = result.verdicts
+    if verdicts:
+        worst = max(v.risk_score for v in verdicts)
+        flagged = sum(1 for v in verdicts if v.verdict in {"needs review", "reject/high risk"})
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Tools scanned", len(verdicts))
+        m2.metric("Flagged for review", flagged)
+        m3.metric("Highest risk score", f"{worst}/100")
+
+    card_cols = st.columns(min(len(verdicts), 3) or 1)
+    for idx, verdict in enumerate(verdicts):
+        with card_cols[idx % len(card_cols)]:
+            st.markdown(
+                ui.verdict_card(verdict.tool_name, verdict.verdict, verdict.risk_score, verdict.failed_policy),
+                unsafe_allow_html=True,
+            )
 
     for verdict in result.verdicts:
-        with st.expander(f"Evidence drilldown: {verdict.tool_name}"):
+        with st.expander(f"Evidence drilldown · {verdict.tool_name}"):
+            st.markdown(ui.verdict_badge_html(verdict.verdict), unsafe_allow_html=True)
+            if verdict.summary:
+                st.caption(verdict.summary)
             st.markdown("#### Why this score?")
             st.dataframe(
                 [
@@ -126,16 +187,16 @@ if st.button(button_label):
 
     trace_path = output_dir / "agent_trace.json"
     if trace_path.exists():
-        st.subheader("Agent trace")
+        ui.section("Agent trace", "Plan → search → read → extract → verify → re-plan.")
         trace = json.loads(trace_path.read_text(encoding="utf-8"))
-        st.dataframe(trace, use_container_width=True)
+        st.dataframe(trace, use_container_width=True, hide_index=True)
         with st.expander("Raw trace JSON"):
             st.json(trace)
 
-    st.success(f"Report written to {result.markdown_report}")
+    st.success(f"✅ Audit packet written to {result.markdown_report}")
 
 if "last_result" in st.session_state:
-    if st.button("Save approval decisions"):
+    if st.button("Save approval decisions", type="primary"):
         request_payload = st.session_state.get("last_request", {})
         result = st.session_state["last_result"]
         saved = []
@@ -151,7 +212,7 @@ if "last_result" in st.session_state:
 
 saved_decisions = store.list_decisions()
 if saved_decisions:
-    st.subheader("Saved decisions")
+    ui.section("Saved decisions", "Your approval record, ready for repeat requests and weekly rescans.")
     st.dataframe(
         [
             {
@@ -165,4 +226,5 @@ if saved_decisions:
             for d in saved_decisions
         ],
         use_container_width=True,
+        hide_index=True,
     )

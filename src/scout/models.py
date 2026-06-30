@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 Status = Literal["pass", "fail", "unclear"]
 VerdictLabel = Literal["approve", "conditional approve", "needs review", "reject/high risk"]
+SourceRelation = Literal["official", "third_party", "unrelated", "unknown"]
 
 
 class Requirement(BaseModel):
@@ -23,6 +24,7 @@ class EvidenceClaim(BaseModel):
     tool_name: str
     source_url: str
     source_type: str
+    source_relation: SourceRelation = "unknown"
     risk_category: str
     claim_text: str
     evidence_quote: str
@@ -62,6 +64,9 @@ class ToolVerdict(BaseModel):
     failed_policy: list[str]
     summary: str
     recommended_policy: str
+    allowed_usage: list[str] = Field(default_factory=list)
+    blocked_usage: list[str] = Field(default_factory=list)
+    required_controls: list[str] = Field(default_factory=list)
     score_reasons: list[ScoreReason] = Field(default_factory=list)
     remediation_steps: list[RemediationStep] = Field(default_factory=list)
     requirements: list[RequirementAssessment] = Field(default_factory=list)
@@ -72,6 +77,7 @@ class SourceRecord(BaseModel):
     source_url: str
     source_title: str
     source_type: str
+    source_relation: SourceRelation = "unknown"
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content_hash: str
     snippet: str

@@ -33,6 +33,27 @@ def test_report_renders_requirement_matrix_with_citations():
     assert "SSO is available on enterprise plans." in md
 
 
+def test_report_renders_scoped_approval_profile():
+    verdict = ToolVerdict(
+        tool_name="Cursor",
+        risk_score=46,
+        verdict="conditional approve",
+        failed_policy=[],
+        summary="Source-code handling needs review.",
+        recommended_policy="Approve only with documented controls.",
+        allowed_usage=["Enterprise workspace coding on internal repos"],
+        blocked_usage=["Customer data", "Secrets or production credentials"],
+        required_controls=["SSO enforced", "Privacy mode enabled", "DPA executed"],
+    )
+
+    md = render_markdown_report("Security-sensitive company", [verdict])
+
+    assert "### Scoped approval profile" in md
+    assert "Enterprise workspace coding on internal repos" in md
+    assert "Customer data" in md
+    assert "Privacy mode enabled" in md
+
+
 def test_report_renders_score_sources_and_compliance_roadmap():
     verdict = ToolVerdict(
         tool_name="Cursor",

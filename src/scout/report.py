@@ -3,6 +3,10 @@ from __future__ import annotations
 from scout.models import ToolVerdict
 
 
+def _bullet_lines(items: list[str]) -> list[str]:
+    return [f"- {item}" for item in items]
+
+
 def render_markdown_report(company_context: str, verdicts: list[ToolVerdict]) -> str:
     lines: list[str] = [
         "# Shadow AI Scout Report",
@@ -30,6 +34,17 @@ def render_markdown_report(company_context: str, verdicts: list[ToolVerdict]) ->
             f"Summary: {verdict.summary}",
             "",
             f"Recommended policy: {verdict.recommended_policy}",
+            "",
+            "### Scoped approval profile",
+            "",
+            "**Allowed**",
+            *_bullet_lines(verdict.allowed_usage or ["No approved usage until required controls are confirmed."]),
+            "",
+            "**Blocked**",
+            *_bullet_lines(verdict.blocked_usage or ["Sensitive company data until explicitly approved."]),
+            "",
+            "**Required controls**",
+            *_bullet_lines(verdict.required_controls or ["Reviewer sign-off and retained evidence packet."]),
             "",
             "### Requirement matrix",
             "",

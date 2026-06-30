@@ -22,6 +22,11 @@ def provider_key_error(provider: str, status_code: int, detail: str) -> ScoutAPI
             "Gemini rejected the API key. Google AI Studio keys usually start with AIza; "
             "regenerate one at https://aistudio.google.com/apikey and update GEMINI_API_KEY in .env."
         )
+    elif provider == "Anthropic":
+        msg = (
+            "Anthropic rejected the API key. Anthropic keys usually start with sk-ant-; "
+            "regenerate one at https://console.anthropic.com/settings/keys and update ANTHROPIC_API_KEY in .env."
+        )
     else:
         msg = f"{provider} rejected the API request. Check the configured API key."
     return ScoutAPIError(provider, msg, f"HTTP {status_code}: {detail[:300]}")

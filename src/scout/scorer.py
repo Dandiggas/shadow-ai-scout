@@ -16,6 +16,14 @@ RISK_CATEGORY_WEIGHTS = {
     "Breach/news history": 15,
 }
 
+_SENSITIVE_APPROVAL_RISKS = {
+    "Source code exposure",
+    "Customer data exposure",
+    "Meeting transcript exposure",
+    "Local device access",
+    "Browser access",
+}
+
 NEGATIVE_CONTROL_MARKERS = (
     " no ",
     " not ",
@@ -81,6 +89,8 @@ def _is_negative_control_claim(claim: EvidenceClaim) -> bool:
 
 
 def _is_supporting_control_claim(claim: EvidenceClaim) -> bool:
+    if claim.source_relation == "third_party":
+        return False
     return claim.severity <= 1 or _has_positive_control_marker(claim)
 
 
@@ -165,10 +175,13 @@ def score_tool(tool_name: str, requirements: list[Requirement], claims: list[Evi
         verdict = "reject/high risk"
 
     top_risks = sorted([c for c in relevant_claims if c.severity >= 2], key=lambda c: (c.severity, c.confidence), reverse=True)[:2]
+    if verdict == "approve" and any(claim.risk_category in _SENSITIVE_APPROVAL_RISKS for claim in top_risks):
+        verdict = "conditional approve"
     risk_summary = "; ".join(claim.claim_text for claim in top_risks) or "No high-confidence public risk claims found."
     recommended = _recommend(verdict, failed_policy)
     score_reasons = _score_reasons(assessments, risk_deltas_by_category, risk_claim_by_category)
     remediation_steps = _remediation_steps(assessments, top_risks)
+    allowed_usage, blocked_usage, required_controls = _scoped_profile(verdict, assessments, top_risks)
 
     return ToolVerdict(
         tool_name=tool_name,
@@ -177,10 +190,54 @@ def score_tool(tool_name: str, requirements: list[Requirement], claims: list[Evi
         failed_policy=failed_policy,
         summary=risk_summary,
         recommended_policy=recommended,
+        allowed_usage=allowed_usage,
+        blocked_usage=blocked_usage,
+        required_controls=required_controls,
         score_reasons=score_reasons,
         remediation_steps=remediation_steps,
         requirements=assessments,
     )
+
+
+def _scoped_profile(verdict: str, assessments: list[RequirementAssessment], top_risks: list[EvidenceClaim]) -> tuple[list[str], list[str], list[str]]:
+    missing_controls = [assessment.label for assessment in assessments if assessment.status != "pass"]
+    risk_categories = {claim.risk_category for claim in top_risks}
+
+    if verdict == "approve":
+        allowed = ["Normal company use covered by the cited evidence packet."]
+    elif verdict == "conditional approve":
+        allowed = ["Restricted rollout only after required controls are documented."]
+    else:
+        allowed = ["No production or sensitive-data use until security/legal review is complete."]
+
+    blocked: list[str] = []
+    if "Source code exposure" in risk_categories:
+        blocked.extend(["Unmanaged source-code repositories", "Secrets or production credentials"])
+    if "Customer data exposure" in risk_categories:
+        blocked.append("Customer data")
+    if "Meeting transcript exposure" in risk_categories:
+        blocked.append("Customer calls or sensitive meeting transcripts")
+    if "Local device access" in risk_categories:
+        blocked.append("Always-on screen/audio capture on unmanaged devices")
+    if not blocked and verdict != "approve":
+        blocked.append("Sensitive company data until approval conditions are met")
+
+    required = missing_controls or ["Retain evidence packet and rescan periodically"]
+    if verdict in {"conditional approve", "needs review"}:
+        required.append("Named reviewer accepts scoped approval conditions")
+
+    return _dedupe(allowed), _dedupe(blocked), _dedupe(required)
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        output.append(item)
+    return output
 
 
 def _score_reasons(assessments: list[RequirementAssessment], risk_deltas_by_category: dict[str, int], risk_claim_by_category: dict[str, EvidenceClaim]) -> list[ScoreReason]:

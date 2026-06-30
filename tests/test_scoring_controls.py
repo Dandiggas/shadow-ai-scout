@@ -1,5 +1,6 @@
 from scout.models import EvidenceClaim, Requirement
-from scout.scorer import score_tool
+from scout.policy import default_requirements
+from scout.scorer import assess_requirement, score_tool
 
 
 def test_positive_control_claims_do_not_create_reject_verdict():
@@ -105,3 +106,38 @@ def test_clean_policy_pass_caps_adverse_claims_at_needs_review_not_reject():
     assert 51 <= verdict.risk_score <= 75
     assert any(reason.label == "Source code exposure" and reason.source_url == "https://third-party.example/cursor" for reason in verdict.score_reasons)
     assert any("source-code" in step.action.lower() for step in verdict.remediation_steps)
+
+
+def test_positive_control_claims_from_third_party_do_not_satisfy_required_vendor_controls():
+    dpa = next(req for req in default_requirements() if req.id == "dpa")
+    claim = EvidenceClaim(
+        tool_name="Browserbase",
+        source_url="https://jasper.ai/legal/dpa",
+        source_type="terms",
+        source_relation="third_party",
+        risk_category="GDPR / DPA",
+        claim_text="Jasper offers a data processing agreement.",
+        evidence_quote="Data Processing Agreement",
+        severity=0,
+        confidence=1.0,
+    )
+
+    result = assess_requirement(dpa, [claim])
+
+    assert result.status == "unclear"
+    assert result.source_url == ""
+    assert result.action == "vendor/security review required"
+
+
+def test_sensitive_data_risk_cannot_be_unrestricted_approve():
+    requirements = [Requirement(id="dpa", label="DPA available", keywords=["data processing agreement"], fail_weight=12)]
+    claims = [
+        EvidenceClaim(tool_name="Cursor", source_url="https://cursor.com/terms", source_type="terms", risk_category="GDPR / DPA", claim_text="Cursor offers a DPA.", evidence_quote="Data Processing Agreement", severity=0, confidence=1.0),
+        EvidenceClaim(tool_name="Cursor", source_url="https://cursor.com/privacy", source_type="privacy", risk_category="Source code exposure", claim_text="Customer code may be processed.", evidence_quote="Customer code may be processed", severity=2, confidence=0.5),
+    ]
+
+    verdict = score_tool("Cursor", requirements, claims)
+
+    assert verdict.verdict == "conditional approve"
+    assert "Unmanaged source-code repositories" in verdict.blocked_usage
+    assert "Restricted rollout" in verdict.allowed_usage[0]

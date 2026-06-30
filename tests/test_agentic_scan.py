@@ -51,3 +51,42 @@ def test_agentic_scan_has_plan_act_observe_trace_and_outputs(tmp_path):
     assert "tavily_search" in trace
     assert "extract_and_verify" in trace
     assert result.verdicts[0].tool_name == "Acme AI"
+
+
+class MixedVendorSearcher:
+    def search(self, query: str, max_results: int = 5):
+        return [
+            SearchResult("Jasper DPA", "https://jasper.ai/legal/dpa", "Jasper data processing agreement"),
+            SearchResult("Browserbase Security", "https://browserbase.com/security", "Browserbase SSO and DPA"),
+        ]
+
+
+class RecordingFetcher:
+    def __init__(self):
+        self.urls: list[str] = []
+
+    def fetch_text(self, url: str) -> str:
+        self.urls.append(url)
+        return "Browserbase supports SSO and offers a Data Processing Agreement."
+
+
+class DPAExtractor:
+    def extract(self, tool_name: str, source_url: str, source_type: str, page_text: str, company_context: str):
+        from scout.models import EvidenceClaim
+
+        return [EvidenceClaim(tool_name=tool_name, source_url=source_url, source_type=source_type, risk_category="GDPR / DPA", claim_text="DPA is available.", evidence_quote="Data Processing Agreement", severity=1, confidence=0.9)]
+
+
+def test_agentic_scan_rejects_unrelated_vendor_sources_before_extraction(tmp_path):
+    fetcher = RecordingFetcher()
+    scanner = AgenticScanner(searcher=MixedVendorSearcher(), fetcher=fetcher, extractor=DPAExtractor())
+
+    result = scanner.scan(["Browserbase"], "Company requires DPA.", tmp_path, max_iterations=1)
+
+    assert "https://jasper.ai/legal/dpa" not in fetcher.urls
+    assert "https://browserbase.com/security" in fetcher.urls
+    assert all(source.source_relation != "unrelated" for source in result.sources)
+    assert all(claim.source_relation == "official" for claim in result.claims)
+    trace = (tmp_path / "agent_trace.json").read_text()
+    assert "reject_unrelated_source" in trace
+    assert "jasper.ai/legal/dpa" in trace

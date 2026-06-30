@@ -11,7 +11,7 @@ Shadow AI Scout is built as a **plan → act → observe → verify → re-plan*
 1. **Plans searches** from the company policy and missing evidence types.
 2. **Acts on the web** through Tavily search and source fetching.
 3. **Observes coverage gaps** across privacy, security, terms, pricing, docs, and news sources.
-4. **Extracts claims with Gemini** into a strict schema.
+4. **Extracts claims with an LLM (Anthropic Claude by default, Gemini optional)** into a strict schema.
 5. **Verifies claims** by rejecting any claim whose quote is not present in the source text.
 6. **Re-plans** follow-up searches when evidence is missing.
 7. **Stores an audit trail** in `evidence.json`, `agent_trace.json`, `cited.md`, and ClickHouse-ready SQL.
@@ -21,7 +21,7 @@ ChatGPT can give an opinion. Shadow AI Scout gives a repeatable approval record 
 ## Sponsor tool mapping
 
 - **Tavily**: live web evidence discovery.
-- **Gemini / DeepMind**: structured extraction and risk reasoning from fetched pages.
+- **Anthropic Claude** (default) / **Gemini** (optional): structured extraction and risk reasoning from fetched pages.
 - **ClickHouse**: audit/evidence schema via generated insert SQL.
 
 Optional later:
@@ -37,17 +37,35 @@ uv sync --extra dev
 cp .env.example .env
 ```
 
-Add keys to `.env` for live mode:
+Add keys to `.env` for live mode.
+
+Default (Anthropic Claude):
 
 ```env
 TAVILY_API_KEY=tvly-...
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+# optional overrides
+# ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+# ANTHROPIC_MAX_TOKENS=2048
+```
+
+Optional (use Gemini instead):
+
+```env
+TAVILY_API_KEY=tvly-...
+LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
 # or GOOGLE_API_KEY=AIza...
 ```
 
-If live scan says Tavily/Gemini rejected the key, regenerate keys here:
+`LLM_PROVIDER` selects the extraction model. If it is unset, Anthropic is used
+when `ANTHROPIC_API_KEY` is present, otherwise Gemini.
+
+If a live scan says a provider rejected the key, regenerate keys here:
 
 - Tavily: https://app.tavily.com/
+- Anthropic: https://console.anthropic.com/settings/keys
 - Gemini: https://aistudio.google.com/apikey
 
 ## Run cached demo — no keys
@@ -110,7 +128,7 @@ uv run --extra dev pytest -q
 ## Current vertical slice
 
 - Cached evidence for Cursor, Granola, and Rewind AI.
-- Live agentic scan path with Tavily + Gemini.
+- Live agentic scan path with Tavily + Anthropic Claude (Gemini optional).
 - Deterministic company-policy requirement scoring after extraction.
 - Requirement matrix with citations.
 - Markdown report generator.
