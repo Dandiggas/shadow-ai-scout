@@ -12,7 +12,7 @@ def test_decision_store_finds_previous_decision_for_same_tool(tmp_path):
         summary="Source-code handling needs review.",
         recommended_policy="Approve only for non-sensitive repos.",
     )
-    request = ApprovalRequest(employee="dev@sophos.com", tool_name="Cursor", use_case="coding", data_involved="source code")
+    request = ApprovalRequest(employee="dev@example.com", tool_name="Cursor", use_case="coding", data_involved="source code")
 
     store.save_decision(request, verdict)
     previous = store.find_previous("cursor")
