@@ -21,3 +21,4 @@ htmlcov/
 # Generated local demo outputs are reproducible
 reports/*
 !reports/.gitkeep
+.gstack/

@@ -1,0 +1,10 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_PASSWORD: scout
+    ports:
+      - "8123:8123"   # HTTP (clickhouse-connect)
+      - "9000:9000"   # native
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }

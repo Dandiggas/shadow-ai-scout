@@ -97,3 +97,24 @@ def review_approved(
 
 if __name__ == "__main__":
     app()
+
+
+@app.command("load-clickhouse")
+def load_clickhouse(
+    report_dir: Path = typer.Argument(Path("reports/demo_run_cached"), help="Report directory containing clickhouse_inserts.sql"),
+    host: str = typer.Option("localhost"),
+    port: int = typer.Option(8123, help="ClickHouse HTTP port"),
+    database: str = typer.Option("scout"),
+    username: str = typer.Option("default"),
+    password: str = typer.Option("", help="ClickHouse password"),
+):
+    """Load a report's evidence into a live ClickHouse (ensures schema, inserts, verifies counts)."""
+    from scout.clickhouse_loader import load_report
+
+    counts = load_report(report_dir, host=host, port=port, database=database, username=username, password=password)
+    table = Table(title=f"Loaded into ClickHouse ({host}:{port}/{database})")
+    table.add_column("Table")
+    table.add_column("Rows", justify="right")
+    for name, n in counts.items():
+        table.add_row(name, str(n))
+    console.print(table)

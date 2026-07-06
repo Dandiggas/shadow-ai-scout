@@ -22,12 +22,35 @@ ChatGPT can give an opinion. Shadow AI Scout gives a repeatable approval record 
 
 - **Tavily**: live web evidence discovery.
 - **Anthropic Claude** (default) / **Gemini** (optional): structured extraction and risk reasoning from fetched pages.
-- **ClickHouse**: audit/evidence schema via generated insert SQL.
+- **ClickHouse**: evidence modelled as a MergeTree schema; loads into a live instance and is queryable.
 
 Optional later:
 
 - Twilio: high-risk alert.
 - ElevenLabs: voice executive summary.
+
+## Load into a live ClickHouse
+
+Every report writes a portable `clickhouse_inserts.sql`, and the evidence is modelled as a
+MergeTree schema (`sql/schema.sql`) with sort keys chosen for how you query it. To load a
+run into a real ClickHouse and query it:
+
+```bash
+docker compose up -d clickhouse                 # local ClickHouse (default user, password: scout)
+pip install "clickhouse-connect>=0.7"           # or: pip install '.[clickhouse]'
+shadow-scout load-clickhouse reports/demo_run_cached --password scout
+```
+
+The loader ensures the schema, executes the inserts through the official `clickhouse-connect`
+client, and prints verified per-table row counts (it re-reads `count()` from ClickHouse, so
+the load is confirmed, not assumed). Then query the evidence directly:
+
+```sql
+SELECT tool_name, verdict, risk_score FROM verdicts ORDER BY risk_score DESC;
+SELECT risk_category, count() FROM risk_claims GROUP BY risk_category ORDER BY 2 DESC;
+```
+
+Verified against ClickHouse 24.8: schema + a full run load and query end-to-end.
 
 ## Setup
 

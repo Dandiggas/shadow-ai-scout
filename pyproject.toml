@@ -22,6 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+clickhouse = ["clickhouse-connect>=0.7"]
 
 [project.scripts]
 shadow-scout = "scout.cli:app"
