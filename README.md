@@ -6,7 +6,9 @@ It investigates AI tools on the public web, extracts cited security/compliance e
 
 ## Demo
 
-[Watch the walkthrough](https://www.linkedin.com/posts/daniel-adekugbe-11a71859_i-shared-an-earlier-hackathon-loom-version-activity-7477863275481776128-KRCv) — the agent reviewing AI tools end to end and producing a sourced approval packet.
+▶ **[Watch the 90-second walkthrough](https://github.com/Dandiggas/shadow-ai-scout/releases/download/demo-v1/shadow-scout-demo.mp4)** — the agent reviewing three AI tools end to end (evidence, per-policy checks, risk verdicts) and producing a sourced approval packet.
+
+(Also posted, with discussion, [on LinkedIn](https://www.linkedin.com/posts/daniel-adekugbe-11a71859_i-shared-an-earlier-hackathon-loom-version-activity-7477863275481776128-KRCv).)
 
 ## Why it is not “just ChatGPT”
 
