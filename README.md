@@ -4,6 +4,10 @@ Autonomous due-diligence agent for shadow AI adoption.
 
 It investigates AI tools on the public web, extracts cited security/compliance evidence, scores the tool against a company policy, and emits an auditable approval packet.
 
+## Demo
+
+[Watch the walkthrough](https://www.linkedin.com/posts/daniel-adekugbe-11a71859_i-shared-an-earlier-hackathon-loom-version-activity-7477863275481776128-KRCv) — the agent reviewing AI tools end to end and producing a sourced approval packet.
+
 ## Why it is not “just ChatGPT”
 
 Shadow AI Scout is built as a **plan → act → observe → verify → re-plan** agent:
